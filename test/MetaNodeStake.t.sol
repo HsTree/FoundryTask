@@ -7,6 +7,10 @@ contract MetaNodeStakeTest is Test{
     MetaNodeStake MetaNodeStakec;
     MetaNodeToken MetaNodeTokenc;
     address admin_address = vm.addr(1);
+    address user_address = vm.addr(2);
+
+    event Withdraw(address indexed user, uint256 indexed poolId, uint256 amount, uint256 indexed blockNumber);
+    event Deposit(address indexed user, uint256 indexed poolId, uint256 amount);
 
     fallback() external payable{
     }
@@ -14,7 +18,7 @@ contract MetaNodeStakeTest is Test{
     }
 
     function setUp() public{
-        console.log(admin_address);
+        // console.log(admin_address);
         MetaNodeTokenc = new MetaNodeToken();
         MetaNodeStakec = new MetaNodeStake();
         MetaNodeStakec.initialize(MetaNodeTokenc, 0, 999999, 10);
@@ -45,6 +49,19 @@ contract MetaNodeStakeTest is Test{
         uint256 unstakeLockedBlocks) = MetaNodeStakec.pool(0);
         assertEq(poolLenth, 1);
         assertEq(stTokenAddress, token_address);
+    }
+
+    function test_addPool1() public{
+        test_addPool();
+        address tokenAddress = address(MetaNodeTokenc);
+        uint256 weight = 1;
+        uint256 mindepositAmount = 1;
+        uint256 lockBlock = 10;
+        bool withUpdate = true;
+        MetaNodeStakec.addPool(tokenAddress, weight, mindepositAmount, lockBlock, withUpdate);
+
+        uint256 poolLenth = MetaNodeStakec.poolLength();
+        assertGt(poolLenth, 1);
     }
 
     function test_massUpdatePool() public{
@@ -87,6 +104,7 @@ contract MetaNodeStakeTest is Test{
     }
 
     function test_transferEth(uint256 amount) public{
+        // vm.assume(amount < 2 ether);  // 设置amount的范围 进行测试
         address(MetaNodeStakec).call{value:amount}(
             abi.encodeWithSignature("depositETH()")
         );
@@ -135,8 +153,10 @@ contract MetaNodeStakeTest is Test{
         assertEq(StAmount, 7 ether); // 检查一下目前还在押质的数量有多少
         assertEq(userBalance-10, address(this).balance / (10**18)); // 检查一下 存进去后的余额是否正确
         
+        MetaNodeStakec.unstake(0, 7 ether);
+        vm.roll(80000);
         MetaNodeStakec.withdraw(0);
-        // assertEq(userBalance - address(this).balance / (10**18), 10); // 检查一下 取出来的余额还对不对
+        assertEq(userBalance - address(this).balance / (10**18), 0); // 检查一下 取出来的余额还对不对
     }
 
     function test_UnStake() public{
@@ -162,7 +182,7 @@ contract MetaNodeStakeTest is Test{
         assertEq(StAmount, 5 ether); 
 
         MetaNodeStakec.unstake(0, 2 ether);
-                (
+        (
            StAmount,
            FinishedMetaNode,
            PendingMetaNode
@@ -171,10 +191,56 @@ contract MetaNodeStakeTest is Test{
     }
 
     function test_withdraw() public{
-        test_UnStake();
+        test_addPool();
         uint256 preTokenBalance = address(MetaNodeStakec).balance/(10**18);
-        assertEq(preTokenBalance, 0);
+        uint256 preUserBalance = address(this).balance/(10**18);
+        
+        test_transferEth(2 ether);
+        vm.roll(10000);
+        uint256 afterTokenBalance = address(MetaNodeStakec).balance/(10**18);
+        uint256 afterUserBalance = address(this).balance/(10**18);
+        
+        assertEq(afterTokenBalance, preTokenBalance + 2);
+        assertEq(afterUserBalance, preUserBalance - 2);
+
+        // 需要先进行记录日志在进行转账 不然的话会报错
+        // vm.expectEmit(true, false, false, true);
+        // emit Withdraw(address(this), 0, 2 ether, 10000);
+
+        MetaNodeStakec.unstake(0, 2 ether);
+
+        // vm.prank(user_address);  // 切换用户
+        vm.roll(20000);
+        MetaNodeStakec.withdraw(0);
+        
+        uint256 finalUserBalance = address(this).balance/(10**18);
+        vm.roll(30000);
+        assertEq(finalUserBalance, preUserBalance); // 检查一下取款后跟存款钱的余额
     }
     
+    function test_depositClaim() public {
+        test_addPool1(); 
+        MetaNodeTokenc.balanceOf(address(this));
+        assertEq(MetaNodeTokenc.balanceOf(address(this)), 10000000000000000000000000);
+        MetaNodeTokenc.approve(address(MetaNodeStakec), 100000000);  // 转账前先进行授权 否则会失败
+        MetaNodeStakec.deposit(1, 100000000);
+        assertEq(MetaNodeTokenc.balanceOf(address(this)), 10000000000000000000000000 - 100000000);
+
+        (address stTokenAddress,
+        uint256 poolWeight,
+        uint256 lastRewardBlock,
+        uint256 accMetaNodePerST,
+        uint256 stTokenAmount,
+        uint256 minDepositAmount,
+        uint256 unstakeLockedBlocks) = MetaNodeStakec.pool(1);
+        assertEq(stTokenAmount, 100000000);
+        assertEq(stTokenAddress, address(MetaNodeTokenc));
+        vm.roll(30000);
+        MetaNodeStakec.claim(1);
+        
+        // uint256 amount = MetaNodeStakec.stakingBalance(1, address(this));
+        // console.log("amount: ", amount);
+        assertGt(MetaNodeTokenc.balanceOf(address(this)), 10000000000000000000000000 - 100000000); // 看看押质后的余额是否增加
+    }
 
 }

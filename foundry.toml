@@ -6,8 +6,6 @@ solc_version = "0.8.22"
 optimizer = true
 optimizer_runs = 200
 
-[rpc_endpoints]
-ethereum = "https://sepolia.infura.io/v3/af4112b1f20f4c4c93076eed895f8742"
-optimism = "https://optimism-sepolia.infura.io/v3/af4112b1f20f4c4c93076eed895f8742"
+
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

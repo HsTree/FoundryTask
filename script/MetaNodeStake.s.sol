@@ -17,5 +17,4 @@ contract MetaNodeStakeScript is Script {
         vm.stopBroadcast();
         console.log(address(stake));
     }
-
 }

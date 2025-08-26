@@ -2,10 +2,23 @@ pragma solidity ^0.8;
 import {Test,console} from "forge-std/Test.sol";
 import {MetaNodeToken} from "../src/MetaNode.sol";
 import {MetaNodeStake} from "../src/MetaNodeStake.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+library UserAssert{
+    function userAssertEq(address token, address user, uint256 amount) public{
+        uint256 userBalance = ERC20(token).balanceOf(address(user));
+        if (userBalance != amount) {
+            revert(string(abi.encodePacked("UserAssert: balance not equal, expected ")));
+        }
+    }
+}
 
 contract MetaNodeStakeTest is Test{
     MetaNodeStake MetaNodeStakec;
     MetaNodeToken MetaNodeTokenc;
+
+    using UserAssert for address;
+
     address admin_address = vm.addr(1);
     address user_address = vm.addr(2);
 
@@ -241,6 +254,11 @@ contract MetaNodeStakeTest is Test{
         // uint256 amount = MetaNodeStakec.stakingBalance(1, address(this));
         // console.log("amount: ", amount);
         assertGt(MetaNodeTokenc.balanceOf(address(this)), 10000000000000000000000000 - 100000000); // 看看押质后的余额是否增加
+    }
+
+    function test_assertEq()public {  // 测试一下自定义的library功能的使用方法
+        address(MetaNodeTokenc).userAssertEq(address(this), 10000000000000000000000001);
+        // UserAssert.userAssertEq(address(MetaNodeTokenc), address(this), 10000000000000000000000001);
     }
 
 }

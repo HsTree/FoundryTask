@@ -14,3 +14,7 @@ docs/
 .env
 
 foundry.toml
+
+developments/
+
+slither.md
